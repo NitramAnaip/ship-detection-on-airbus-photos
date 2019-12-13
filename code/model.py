@@ -1,17 +1,19 @@
 import cv2
 import numpy as np
-from sampler import Sampler, Dataloader
+from sampler import Sampler
 import tensorflow as tf
 from PIL import Image
+from random import shuffle
 from tensorflow.keras.layers import Conv2D, Conv2DTranspose, BatchNormalization, Activation, MaxPooling2D, concatenate, add, Input, BatchNormalization, Activation, Dense, Dropout, Lambda
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.models import Model, load_model
 from tensorflow.python.keras import optimizers, losses
+from utils import create_list
 
 
 
 input_shape=[768, 768]
-
+data_partitions=[0.8,0.2] #The portion of training and valiating data. If data_partitions[0]=0.8 then 80% od the data is training data
 
 
 
@@ -79,20 +81,29 @@ optimizer = optimizers.SGD(
         )
 
 
-
 model=model(input_shape)
 model.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=['accuracy'])
 model.summary()
 
-# train_sampler=Sampler(2, "train")
 
-# a = model.fit_generator(train_sampler)
+#Creating the Test and Validation data lists
+data=create_list()
+shuffle(data) #This line is just to not have the same training data every time
+train_border=int(len(data)*data_partitions[0])
+train_data=data[:train_border]
+valid_data=data[train_border:]
+
+
+#Initiating the samplers for the fit_generator
+train_sampler=Sampler(batch_size=2, data=train_data, data_type="train")
+valid_sampler=Sampler(batch_size=2, data=valid_data, data_type="valid")
+a = model.fit_generator(train_sampler, epochs=150, verbose=1, validation_data=valid_sampler, max_queue_size=100,
+    workers=4, use_multiprocessing=True)
 
 
 
-
-generator=Dataloader(1, "train")
-a = model.fit_generator(
-    generator.yielder(), epochs=150, steps_per_epoch=30, verbose=1)
+# generator=Dataloader(1, "train")
+# a = model.fit_generator(
+#     generator.yielder(), epochs=150, steps_per_epoch=30, verbose=1)
 
 # https://www.depends-on-the-definition.com/unet-keras-segmenting-images/
