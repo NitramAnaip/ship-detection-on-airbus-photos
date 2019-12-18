@@ -1,6 +1,8 @@
 import cv2
+import os
+import pickle
 import numpy as np
-from sampler import Sampler
+from sampler import Sampler, test_generator
 import tensorflow as tf
 from PIL import Image
 from random import shuffle
@@ -9,6 +11,12 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.models import Model, load_model
 from tensorflow.python.keras import optimizers, losses
 from utils import create_list
+
+
+# #Just use part of GPU memory:
+# gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.1)
+# sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+
 
 
 
@@ -38,7 +46,6 @@ def conv_block(input_tensor, n_filters, batchnorm, kernel_size=3):
 
 
 def model(input_shape, n_filters=16, batchnorm=False, dropout=False):
-
 
     inputs = Input(shape=(input_shape[1], input_shape[0],3))
 
@@ -70,6 +77,8 @@ def model(input_shape, n_filters=16, batchnorm=False, dropout=False):
     u3=concatenate([u3, c1])
     u3=conv_block(u3, n_filters, batchnorm)
 
+
+
     outputs = Conv2D(3, (1, 1), activation='sigmoid') (u3)
     model = Model(inputs=inputs, outputs=outputs)
     return model
@@ -81,29 +90,72 @@ optimizer = optimizers.SGD(
         )
 
 
+
+
+
+
 model=model(input_shape)
 model.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=['accuracy'])
 model.summary()
 
 
 #Creating the Test and Validation data lists
-data=create_list()
+if not os.path.exists("/home/ubuntu/martin/kaggle/data/data_list.pkl"):
+    data=create_list()
+    output = open("/home/ubuntu/martin/kaggle/data/data_list.pkl", 'wb')
+    pickle.dump(data, output)
+    output.close()
+
+else:
+    pkl_file = open("/home/ubuntu/martin/kaggle/data/data_list.pkl", 'rb')
+    data = pickle.load(pkl_file)
+    pkl_file.close()
+
+
 shuffle(data) #This line is just to not have the same training data every time
 train_border=int(len(data)*data_partitions[0])
+print(train_border)
+import pdb
+pdb.set_trace()
 train_data=data[:train_border]
 valid_data=data[train_border:]
 
 
+
+early_stopping=EarlyStopping(monitor="acc", patience=15, verbose=1, mode="max")
+checkpoint_path="/home/ubuntu/martin/kaggle/ship-detection-on-airbus-photos/checkpoint.hdf5"
+checkpoint = ModelCheckpoint(
+    checkpoint_path,
+    period=1,
+    monitor="acc",
+    verbose=1,
+    save_best_only=True,
+    mode="max",
+)
+
+
 #Initiating the samplers for the fit_generator
-train_sampler=Sampler(batch_size=2, data=train_data, data_type="train")
-valid_sampler=Sampler(batch_size=2, data=valid_data, data_type="valid")
+train_sampler=Sampler(batch_size=10, data=train_data, data_type="train")
+valid_sampler=Sampler(batch_size=10, data=valid_data, data_type="valid")
 a = model.fit_generator(train_sampler, epochs=150, verbose=1, validation_data=valid_sampler, max_queue_size=100,
-    workers=4, use_multiprocessing=True)
+    workers=32, use_multiprocessing=True, callbacks=[early_stopping, checkpoint])
 
 
 
-# generator=Dataloader(1, "train")
-# a = model.fit_generator(
-#     generator.yielder(), epochs=150, steps_per_epoch=30, verbose=1)
+model.load_weights(checkpoint_path)
+
+root="/home/ubuntu/martin/kaggle/data/test_data"
+test_list=["75f89af6f.jpg", "75f1022b4.jpg", "75f4396e7.jpg", "75f4880cd.jpg", "75f6217a4.jpg", "75f9225f6.jpg", "075f59258.jpg", "75f140408.jpg", "75f419101.jpg", "75f771352.jpg"]
+for i in range (len(test_list)):
+    test_list[i]=root+test_list[i]
+test_generator(test_list)
+images=model.predict(test_generator, batch_size=1, verbose=0, steps=len(test_list))
+
+
+import pdb
+pdb.set_trace()
+
+for i in range (len(images)):
+    cv2.imsave(images[i], "/home/ubuntu/martin/kaggle/result_{}".format(test_list[i][-14:]))
 
 # https://www.depends-on-the-definition.com/unet-keras-segmenting-images/

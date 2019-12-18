@@ -22,12 +22,12 @@ class Sampler(Sequence):
         frame_path='init'
         pool=self.indexes[idx*self.batch_size:(idx+1)*self.batch_size]
         for position in pool:
-            img=cv2.imread("/home/ubuntu/Stages/kaggle/airbus-ship-detection/train_v2/"+self.label_list[position][0])
+            img=cv2.imread("/home/ubuntu/martin/kaggle/data/train_v2/"+self.label_list[position][0])
             seg_img=create_segmented_seg_img(self.label_list[position][1])
             batch.append(img)
             outputs.append(seg_img)
-            cv2.imwrite("/home/ubuntu/images/seg/{}".format(self.label_list[position][0]), seg_img)
-            cv2.imwrite("/home/ubuntu/images/non_seg/{}".format(self.label_list[position][0]), img)
+            cv2.imwrite("/home/ubuntu/martin/kaggle/images/seg/{}".format(self.label_list[position][0]), seg_img)
+            cv2.imwrite("/home/ubuntu/martin/kaggle/images/non_seg/{}".format(self.label_list[position][0]), img)
         batch=np.array(batch)
         outputs=np.array(outputs)
         return(batch, outputs)
@@ -38,6 +38,16 @@ class Sampler(Sequence):
     def __hash__(self):
         return hash(repr(self))
 
+
+
+
+def test_generator(test_list):
+    """
+    Generator specifically for the test list of images' paths
+    """
+    for i in len(test_list):
+        img=cv2.imread(test_list[i])
+        yield (img)
 
 
 

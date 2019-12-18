@@ -1,20 +1,32 @@
 import numpy as np
 import csv
+import os
 
 
 def  create_list():
-    path="/home/ubuntu/Stages/kaggle/airbus-ship-detection/train_ship_segmentations_v2.csv"
+    path="/home/ubuntu/martin/kaggle/data/train_ship_segmentations_v2.csv"
     label_list = []
+    images=os.listdir("/home/ubuntu/martin/kaggle/data/train_v2")
+    
     with open(path) as csvfile:
         data = csv.reader(csvfile, delimiter=",")
+        index=0
         for line in data:
             element = [line[0], line[1].split()]
-            label_list.append(element)
-    label_list.pop(0)  # simply to remove the first line which isn't data
+            if line[0] in images:
+                label_list.append(element)
+            if index>10000:
+                break
+            index+=1
     for elem in label_list:
         for i in range(len(elem[1])):
             elem[1][i]=int(elem[1][i])
     return label_list
+
+
+
+
+
 
 
 def create_segmented_seg_img(values):
